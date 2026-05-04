@@ -90,7 +90,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 SummaryCard(
                   title: "Today's Collection",
                   value:
-                      AppDateUtils.formatCurrency(dashboard.todaysCollection),
+                      AppDateUtils.formatCurrency(dashboard.todaysCollection).split('.')[0],
                   icon: Icons.currency_rupee,
                   color: AppColors.success,
                   background: const Color(0xFFE8F5E9),

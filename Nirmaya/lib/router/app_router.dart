@@ -37,10 +37,14 @@ GoRouter createRouter(AuthProvider authProvider) {
         return location == '/splash' ? null : '/splash';
       }
       if (status == AuthStatus.unauthenticated) {
-        return location == '/login' ? null : '/login';
+        return (location == '/onboarding' || location == '/login')
+            ? null
+            : '/onboarding';
       }
       if (status == AuthStatus.authenticated) {
-        if (location == '/splash' || location == '/login') {
+        if (location == '/splash' ||
+            location == '/onboarding' ||
+            location == '/login') {
           return '/dashboard';
         }
       }
@@ -53,6 +57,10 @@ GoRouter createRouter(AuthProvider authProvider) {
       ),
       GoRoute(
         path: '/login',
+        builder: (_, __) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/onboarding',
         builder: (_, __) => const LoginScreen(),
       ),
       ShellRoute(
@@ -120,6 +128,8 @@ GoRouter createRouter(AuthProvider authProvider) {
           return AddVisitScreen(
             treatmentId: extra['treatmentId'] as String,
             treatmentTitle: extra['treatmentTitle'] as String? ?? '',
+            remainingAmount:
+                double.tryParse(extra['remainingAmount']?.toString() ?? ''),
           );
         },
       ),
@@ -239,27 +249,7 @@ class MoreScreen extends StatelessWidget {
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             onTap: () async {
-              final confirmed = await showDialog<bool>(
-                context: context,
-                builder: (_) => AlertDialog(
-                  title: const Text('Logout'),
-                  content: const Text('Are you sure you want to logout?'),
-                  actions: [
-                    TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: const Text('Cancel')),
-                    TextButton(
-                      onPressed: () => Navigator.pop(context, true),
-                      child: const Text('Logout',
-                          style: TextStyle(color: Color(0xFFEF5350))),
-                    ),
-                  ],
-                ),
-              );
-              if (confirmed == true) {
-                if (!context.mounted) return;
-                await context.read<AuthProvider>().logout();
-              }
+              await context.read<AuthProvider>().logout();
             },
           ),
         ],

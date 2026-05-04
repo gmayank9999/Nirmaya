@@ -91,9 +91,12 @@ class _PatientsListScreenState extends State<PatientsListScreen>
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: TextField(
               controller: _searchCtrl,
-              onChanged: (v) => context
-                  .read<PatientProvider>()
-                  .loadPatients(search: v, refresh: true),
+              onChanged: (v) {
+                setState(() {});
+                context
+                    .read<PatientProvider>()
+                    .loadPatients(search: v, refresh: true);
+              },
               decoration: InputDecoration(
                 hintText: 'Search patients...',
                 prefixIcon: const Icon(Icons.search),

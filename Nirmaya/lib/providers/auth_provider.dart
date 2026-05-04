@@ -27,11 +27,17 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return;
     }
+    final cachedUser = await _storage.getUser();
+    if (cachedUser != null) {
+      _user = UserModel.fromJson(cachedUser);
+      _status = AuthStatus.authenticated;
+      notifyListeners();
+    }
     final user = await _repo.verifyToken();
     if (user != null) {
       _user = user;
       _status = AuthStatus.authenticated;
-    } else {
+    } else if (cachedUser == null) {
       await _storage.clear();
       _status = AuthStatus.unauthenticated;
     }

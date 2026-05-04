@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/validators.dart';
@@ -117,6 +118,11 @@ class _LoginScreenState extends State<LoginScreen> {
                                   label: 'Phone Number',
                                   controller: _phoneCtrl,
                                   keyboardType: TextInputType.phone,
+                                  maxLength: 10,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                    LengthLimitingTextInputFormatter(10),
+                                  ],
                                   validator: AppValidators.phone,
                                   prefixIcon: const Icon(Icons.phone_outlined),
                                   textInputAction: TextInputAction.next,

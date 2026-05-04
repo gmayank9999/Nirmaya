@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -165,6 +166,11 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
                 label: 'Phone Number',
                 controller: _phoneCtrl,
                 keyboardType: TextInputType.phone,
+                maxLength: 10,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(10),
+                ],
                 validator: AppValidators.phone,
                 prefixIcon: const Icon(Icons.phone_outlined),
                 textInputAction: TextInputAction.next,

@@ -59,7 +59,7 @@ class _VisitDetailScreenState extends State<VisitDetailScreen> {
                     padding: const EdgeInsets.all(16),
                     children: [
                       _InfoCard(
-                        title: AppDateUtils.formatDate(
+                        title: AppDateUtils.formatDateWithOptionalTime(
                             visit['visitDate']?.toString()),
                         subtitle:
                             treatment?['title']?.toString() ?? 'Treatment',
@@ -108,7 +108,7 @@ class _VisitDetailScreenState extends State<VisitDetailScreen> {
                           return _ListTileCard(
                             icon: Icons.description_outlined,
                             title: item['name']?.toString() ??
-                              item['fileName']?.toString() ??
+                                item['fileName']?.toString() ??
                                 item['category']?.toString() ??
                                 'Document',
                             subtitle: item['category']?.toString() ?? '',

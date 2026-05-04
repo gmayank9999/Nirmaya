@@ -64,11 +64,13 @@ class _TreatmentDetailScreenState extends State<TreatmentDetailScreen>
         ],
         bottom: TabBar(
           controller: _tabCtrl,
+          labelColor: Colors.white, 
+          unselectedLabelColor: Colors.white70, 
           tabs: const [
             Tab(text: 'Visits'),
             Tab(text: 'Payments'),
             Tab(text: 'Docs'),
-            Tab(text: 'Installments'),
+            // Tab(text: 'Installments'),
           ],
         ),
       ),
@@ -129,6 +131,7 @@ class _TreatmentDetailScreenState extends State<TreatmentDetailScreen>
                   context.push('/add-visit', extra: {
                     'treatmentId': treatment.id,
                     'treatmentTitle': treatment.title,
+                    'remainingAmount': treatment.balanceDouble,
                   });
                 } else if (tab == 1) {
                   context.push('/add-transaction', extra: {
@@ -173,6 +176,7 @@ class _VisitsTab extends StatelessWidget {
               context.push('/add-visit', extra: {
                 'treatmentId': t.id,
                 'treatmentTitle': t.title,
+                'remainingAmount': t.balanceDouble,
               });
             }
           },
@@ -213,7 +217,7 @@ class _VisitsTab extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        AppDateUtils.formatDate(v.visitDate),
+                        AppDateUtils.formatDateWithOptionalTime(v.visitDate),
                         style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                       if (v.notes != null && v.notes!.isNotEmpty)
@@ -297,7 +301,7 @@ class _PaymentsTab extends StatelessWidget {
                           fontWeight: FontWeight.w700, fontSize: 15),
                     ),
                     Text(
-                      '${t.paymentModeDisplay} · ${AppDateUtils.formatDate(t.transactionDate)}',
+                      '${t.paymentModeDisplay} · ${AppDateUtils.formatDateWithOptionalTime(t.transactionDate)}',
                       style: const TextStyle(
                           fontSize: 12, color: AppColors.textSecondary),
                     ),
@@ -349,10 +353,8 @@ class _DocumentsTab extends StatelessWidget {
                 color: AppColors.primary),
             title: Text(
               (doc.name?.trim().isNotEmpty ?? false)
-                ? doc.name!
-                : (doc.fileName.isEmpty
-                  ? doc.categoryDisplay
-                  : doc.fileName),
+                  ? doc.name!
+                  : (doc.fileName.isEmpty ? doc.categoryDisplay : doc.fileName),
             ),
             subtitle: Text('${doc.categoryDisplay} · ${doc.fileSizeDisplay}'),
             trailing: const Icon(Icons.open_in_new),

@@ -40,6 +40,12 @@ class AppDateUtils {
     }
   }
 
+  static String formatDateWithOptionalTime(String? isoDate) {
+    if (isoDate == null) return '-';
+    final hasTime = RegExp(r'[T ]\d{2}:\d{2}').hasMatch(isoDate);
+    return hasTime ? formatDateTime(isoDate) : formatDate(isoDate);
+  }
+
   static String toApiDate(DateTime dt) {
     final istMidnightAsUtc =
         DateTime.utc(dt.year, dt.month, dt.day).subtract(_istOffset);

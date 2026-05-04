@@ -80,7 +80,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                                     ),
                                   ),
                                   Text(
-                                    '${t.paymentModeDisplay} · ${AppDateUtils.formatDate(t.transactionDate)}',
+                                    '${t.paymentModeDisplay} · ${AppDateUtils.formatDateWithOptionalTime(t.transactionDate)}',
                                     style: const TextStyle(
                                       fontSize: 12,
                                       color: AppColors.textSecondary,
