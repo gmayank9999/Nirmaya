@@ -151,6 +151,66 @@ class TreatmentProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ── Instant local updates for the Visits tab ────────────────────────────
+  void addVisitToDetail(VisitModel visit) {
+    _treatmentVisits.insert(0, visit);
+    notifyListeners();
+  }
+
+  void updateVisitInDetail(VisitModel updated) {
+    final idx = _treatmentVisits.indexWhere((v) => v.id == updated.id);
+    if (idx >= 0) {
+      _treatmentVisits[idx] = updated;
+      notifyListeners();
+    }
+  }
+
+  void removeVisitFromDetail(String visitId) {
+    _treatmentVisits.removeWhere((v) => v.id == visitId);
+    notifyListeners();
+  }
+
+  // ── Instant local updates for the Payments tab ────────────────────────────
+  // The detail screen watches _treatmentTransactions; add/edit/delete here so
+  // the UI updates immediately without a full reload.
+  void addTransactionToDetail(TransactionModel tx) {
+    _treatmentTransactions.insert(0, tx);
+    // Update running paid/balance totals locally
+    _paidAmount += tx.amountDouble;
+    if (_selectedTreatment != null) {
+      _balance = (_selectedTreatment!.finalFee - _paidAmount)
+          .clamp(0, double.infinity);
+    }
+    notifyListeners();
+  }
+
+  void updateTransactionInDetail(TransactionModel updated) {
+    final idx = _treatmentTransactions.indexWhere((t) => t.id == updated.id);
+    if (idx >= 0) {
+      final old = _treatmentTransactions[idx];
+      _treatmentTransactions[idx] = updated;
+      _paidAmount = _paidAmount - old.amountDouble + updated.amountDouble;
+      if (_selectedTreatment != null) {
+        _balance = (_selectedTreatment!.finalFee - _paidAmount)
+            .clamp(0, double.infinity);
+      }
+    }
+    notifyListeners();
+  }
+
+  void removeTransactionFromDetail(String txId) {
+    final idx = _treatmentTransactions.indexWhere((t) => t.id == txId);
+    if (idx >= 0) {
+      _paidAmount -= _treatmentTransactions[idx].amountDouble;
+      _treatmentTransactions.removeAt(idx);
+      if (_selectedTreatment != null) {
+        _balance = (_selectedTreatment!.finalFee - _paidAmount)
+            .clamp(0, double.infinity);
+      }
+    }
+    notifyListeners();
+  }
+
   void clearError() {
     _error = null;
     notifyListeners();

@@ -1,14 +1,36 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/app_date_utils.dart';
 import '../../providers/treatment_provider.dart';
 import '../../providers/visit_provider.dart';
+import '../../models/visit_model.dart';
+import '../../models/transaction_model.dart';
 import '../../widgets/app_button.dart';
-import '../../widgets/app_text_field.dart';
+
+final _inFmt = NumberFormat('#,##,##0', 'en_IN');
+String _strip(String v) => v.replaceAll(',', '');
+
+class _IndianFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue old, TextEditingValue next) {
+    final raw = _strip(next.text);
+    if (raw.isEmpty) return next.copyWith(text: '');
+    final n = int.tryParse(raw);
+    if (n == null) return old;
+    final formatted = _inFmt.format(n);
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
 
 class AddVisitScreen extends StatefulWidget {
   final String treatmentId;
@@ -34,9 +56,16 @@ class _AddVisitScreenState extends State<AddVisitScreen> {
   final _paymentNotesCtrl = TextEditingController();
   DateTime _visitDate = DateTime.now();
   bool _hasPayment = false;
-  String? _paymentMode = 'cash';
+  String _paymentMode = 'cash';
   final List<_NamedFile> _reportFiles = [];
   final List<_NamedFile> _prescriptionFiles = [];
+
+  static const _modes = [
+    ('cash', 'Cash', Icons.payments_outlined),
+    ('upi', 'UPI', Icons.qr_code_scanner_outlined),
+    ('card', 'Card', Icons.credit_card_outlined),
+    ('bank', 'Bank Transfer', Icons.account_balance_outlined),
+  ];
 
   @override
   void dispose() {
@@ -114,8 +143,8 @@ class _AddVisitScreenState extends State<AddVisitScreen> {
       'visitDate': AppDateUtils.toApiDate(_visitDate),
       if (_notesCtrl.text.isNotEmpty) 'notes': _notesCtrl.text.trim(),
       if (_hasPayment && _amountCtrl.text.isNotEmpty)
-        'paymentAmount': _amountCtrl.text.trim(),
-      if (_hasPayment && _paymentMode != null) 'paymentMode': _paymentMode!,
+        'paymentAmount': _parseAmount(_amountCtrl.text).toString(),
+      if (_hasPayment) 'paymentMode': _paymentMode,
       if (_hasPayment && _referenceCtrl.text.isNotEmpty)
         'paymentReferenceId': _referenceCtrl.text.trim(),
       if (_hasPayment && _paymentNotesCtrl.text.isNotEmpty)
@@ -134,7 +163,20 @@ class _AddVisitScreenState extends State<AddVisitScreen> {
                 _prescriptionFiles.map((item) => item.name).toList(),
           )
         : await provider.createVisit(fields);
+        
     if (result != null && mounted) {
+      if (result is VisitModel) {
+        context.read<TreatmentProvider>().addVisitToDetail(result);
+      } else if (result is Map<String, dynamic>) {
+        if (result['visit'] != null) {
+          final v = VisitModel.fromJson(result['visit'] as Map<String, dynamic>);
+          context.read<TreatmentProvider>().addVisitToDetail(v);
+        }
+        if (result['transaction'] != null) {
+          final tx = TransactionModel.fromJson(result['transaction'] as Map<String, dynamic>);
+          context.read<TreatmentProvider>().addTransactionToDetail(tx);
+        }
+      }
       context.pop();
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -177,6 +219,10 @@ class _AddVisitScreenState extends State<AddVisitScreen> {
     return null;
   }
 
+  String _formatDate(DateTime dt) {
+    return DateFormat('dd MMM yyyy').format(dt);
+  }
+
   @override
   Widget build(BuildContext context) {
     final isLoading = context.watch<VisitProvider>().isLoading;
@@ -185,7 +231,7 @@ class _AddVisitScreenState extends State<AddVisitScreen> {
       backgroundColor: AppColors.background,
       appBar: AppBar(title: const Text('Add Visit')),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         child: Form(
           key: _formKey,
           child: Column(
@@ -194,93 +240,255 @@ class _AddVisitScreenState extends State<AddVisitScreen> {
               if (widget.treatmentTitle.isNotEmpty)
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.all(12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
-                    color: AppColors.primarySurface,
-                    borderRadius: BorderRadius.circular(12),
+                    gradient: AppColors.primaryGradient,
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Text(
-                    widget.treatmentTitle,
-                    style: const TextStyle(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w600,
+                  child: Row(
+                    children: [
+                      const Icon(Icons.medical_services_outlined,
+                          color: Colors.white, size: 16),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          widget.treatmentTitle,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+              _Card(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _label('Visit Date', Icons.calendar_today_outlined),
+                    const SizedBox(height: 10),
+                    InkWell(
+                      onTap: _pickDate,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 14),
+                        decoration: BoxDecoration(
+                          color: AppColors.background,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppColors.primary.withValues(alpha: 0.4),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.event_outlined,
+                                size: 16, color: AppColors.primary),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                _formatDate(_visitDate),
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                            const Icon(Icons.edit_calendar_outlined,
+                                size: 16, color: AppColors.primary),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-              AppTextField(
-                label: 'Visit Date',
-                readOnly: true,
-                onTap: _pickDate,
-                initialValue:
-                    '${_visitDate.day}/${_visitDate.month}/${_visitDate.year}',
-                prefixIcon: const Icon(Icons.calendar_today_outlined),
-              ),
-              const SizedBox(height: 14),
-              AppTextField(
-                label: 'Notes (optional)',
-                controller: _notesCtrl,
-                maxLines: 4,
-                prefixIcon: const Icon(Icons.notes_outlined),
-              ),
-              const SizedBox(height: 18),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                value: _hasPayment,
-                onChanged: (value) => setState(() => _hasPayment = value),
-                title: const Text('Add payment'),
-              ),
-              if (_hasPayment) ...[
-                const SizedBox(height: 10),
-                AppTextField(
-                  label: 'Amount',
-                  controller: _amountCtrl,
-                  keyboardType: TextInputType.number,
-                  prefixIcon: const Icon(Icons.currency_rupee),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: _paymentMode,
-                  decoration: const InputDecoration(labelText: 'Payment Mode'),
-                  items: const [
-                    DropdownMenuItem(value: 'cash', child: Text('Cash')),
-                    DropdownMenuItem(value: 'upi', child: Text('UPI')),
-                    DropdownMenuItem(value: 'card', child: Text('Card')),
-                    DropdownMenuItem(value: 'bank', child: Text('Bank')),
+                    const SizedBox(height: 14),
+                    _label('Notes', Icons.notes_outlined),
+                    const SizedBox(height: 10),
+                    _StyledField(
+                      controller: _notesCtrl,
+                      label: 'Visit Notes (optional)',
+                      icon: Icons.notes,
+                      maxLines: 3,
+                    ),
                   ],
-                  onChanged: (value) => setState(() => _paymentMode = value),
                 ),
-                const SizedBox(height: 12),
-                AppTextField(
-                  label: 'Reference ID (optional)',
-                  controller: _referenceCtrl,
-                  prefixIcon: const Icon(Icons.receipt_long_outlined),
-                ),
-                const SizedBox(height: 12),
-                AppTextField(
-                  label: 'Payment notes (optional)',
-                  controller: _paymentNotesCtrl,
-                  prefixIcon: const Icon(Icons.notes_outlined),
-                ),
-              ],
-              const SizedBox(height: 18),
-              _FilePickRow(
-                title: 'Reports',
-                count: _reportFiles.length,
-                onPick: () => _pickDocument(prescription: false),
               ),
-              const SizedBox(height: 10),
-              _FilePickRow(
-                title: 'Prescriptions',
-                count: _prescriptionFiles.length,
-                onPick: () => _pickDocument(prescription: true),
+              const SizedBox(height: 12),
+
+              _Card(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _label('Payment', Icons.payments_outlined),
+                        Switch(
+                          value: _hasPayment,
+                          onChanged: (v) => setState(() => _hasPayment = v),
+                          activeTrackColor: AppColors.primary,
+                        ),
+                      ],
+                    ),
+                    if (_hasPayment) ...[
+                      const Divider(height: 24),
+                      TextFormField(
+                        controller: _amountCtrl,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [_IndianFormatter()],
+                        textInputAction: TextInputAction.next,
+                        style: const TextStyle(
+                            fontSize: 22, fontWeight: FontWeight.w800),
+                        validator: (v) {
+                          if (v == null || _strip(v).isEmpty) {
+                            return 'Amount is required';
+                          }
+                          final d = double.tryParse(_strip(v));
+                          if (d == null || d <= 0) return 'Enter a valid amount';
+                          return null;
+                        },
+                        decoration: InputDecoration(
+                          prefixText: '₹  ',
+                          prefixStyle: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
+                          ),
+                          hintText: '0',
+                          hintStyle: const TextStyle(
+                              color: AppColors.textLight, fontSize: 22),
+                          filled: true,
+                          fillColor: AppColors.primarySurface,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(
+                                color: AppColors.primary, width: 2),
+                          ),
+                          errorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(
+                                color: AppColors.error, width: 1.5),
+                          ),
+                          focusedErrorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(
+                                color: AppColors.error, width: 2),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 14),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _label('Payment Mode', Icons.payment_outlined),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: _modes.map((m) {
+                          final selected = _paymentMode == m.$1;
+                          return Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: GestureDetector(
+                                onTap: () =>
+                                    setState(() => _paymentMode = m.$1),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 180),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: selected
+                                        ? AppColors.primary
+                                        : Colors.white,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: selected
+                                          ? AppColors.primary
+                                          : const Color(0xFFE5E7EB),
+                                    ),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      Icon(m.$3,
+                                          size: 18,
+                                          color: selected
+                                              ? Colors.white
+                                              : AppColors.textSecondary),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        m.$2,
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w600,
+                                          color: selected
+                                              ? Colors.white
+                                              : AppColors.textSecondary,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 16),
+                      _StyledField(
+                        controller: _referenceCtrl,
+                        label: 'Reference / Transaction ID (optional)',
+                        icon: Icons.tag_outlined,
+                      ),
+                      const SizedBox(height: 10),
+                      _StyledField(
+                        controller: _paymentNotesCtrl,
+                        label: 'Payment Notes (optional)',
+                        icon: Icons.notes_outlined,
+                        maxLines: 2,
+                      ),
+                    ],
+                  ],
+                ),
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 12),
+
+              _Card(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _label('Documents', Icons.attach_file),
+                    const SizedBox(height: 14),
+                    _FilePickRow(
+                      title: 'Reports',
+                      count: _reportFiles.length,
+                      onPick: () => _pickDocument(prescription: false),
+                    ),
+                    const SizedBox(height: 10),
+                    _FilePickRow(
+                      title: 'Prescriptions',
+                      count: _prescriptionFiles.length,
+                      onPick: () => _pickDocument(prescription: true),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+
               AppButton(
                 label: 'Add Visit',
                 onPressed: _submit,
                 isLoading: isLoading,
-                icon: Icons.event_available,
+                icon: Icons.check_circle_outline,
               ),
             ],
           ),
@@ -288,6 +496,87 @@ class _AddVisitScreenState extends State<AddVisitScreen> {
       ),
     );
   }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+Widget _label(String text, IconData icon) => Row(
+      children: [
+        Icon(icon, size: 14, color: AppColors.primary),
+        const SizedBox(width: 6),
+        Text(
+          text,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textSecondary,
+            letterSpacing: 0.3,
+          ),
+        ),
+      ],
+    );
+
+class _Card extends StatelessWidget {
+  final Widget child;
+  const _Card({required this.child});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: child,
+      );
+}
+
+class _StyledField extends StatelessWidget {
+  final TextEditingController controller;
+  final String label;
+  final IconData icon;
+  final int maxLines;
+
+  const _StyledField({
+    required this.controller,
+    required this.label,
+    required this.icon,
+    this.maxLines = 1,
+  });
+
+  @override
+  Widget build(BuildContext context) => TextFormField(
+        controller: controller,
+        maxLines: maxLines,
+        textInputAction:
+            maxLines > 1 ? TextInputAction.newline : TextInputAction.next,
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: Icon(icon, color: AppColors.primary, size: 18),
+          filled: true,
+          fillColor: AppColors.background,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFFE5E7EB), width: 1),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide:
+                const BorderSide(color: AppColors.primary, width: 1.5),
+          ),
+        ),
+      );
 }
 
 class _FilePickRow extends StatelessWidget {
@@ -306,25 +595,38 @@ class _FilePickRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.background,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFE5E7EB)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.description_outlined, color: AppColors.primary),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.description_outlined,
+                color: AppColors.primary, size: 20),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              count == 0
-                  ? '$title: no files selected'
-                  : '$title: $count file(s)',
-              style: const TextStyle(fontWeight: FontWeight.w600),
+              count == 0 ? '$title (None)' : '$title: $count selected',
+              style: TextStyle(
+                fontWeight: count > 0 ? FontWeight.w700 : FontWeight.w500,
+                color: count > 0 ? AppColors.textPrimary : AppColors.textLight,
+              ),
             ),
           ),
           IconButton(
             onPressed: onPick,
-            icon: const Icon(Icons.upload_file),
+            style: IconButton.styleFrom(
+              backgroundColor: AppColors.primarySurface,
+              foregroundColor: AppColors.primary,
+            ),
+            icon: const Icon(Icons.add_circle_outline),
           ),
         ],
       ),
@@ -363,7 +665,12 @@ class _DocumentPickerSheetState extends State<_DocumentPickerSheet> {
   }
 
   Future<void> _pickImage(ImageSource source) async {
-    final file = await _picker.pickImage(source: source);
+    final file = await _picker.pickImage(
+      source: source,
+      imageQuality: 50,
+      maxWidth: 1600,
+      maxHeight: 1600,
+    );
     if (!mounted || file == null) return;
     _setPickedFile(_PickedFile(path: file.path, fileName: file.name));
   }
@@ -406,13 +713,14 @@ class _DocumentPickerSheetState extends State<_DocumentPickerSheet> {
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(20, 0, 20, bottomInset + 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(20, 20, 20, bottomInset + 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
               widget.title,
               style: const TextStyle(
                 fontSize: 18,
@@ -481,7 +789,13 @@ class _DocumentPickerSheetState extends State<_DocumentPickerSheet> {
             const SizedBox(height: 14),
             TextFormField(
               controller: _nameCtrl,
-              decoration: const InputDecoration(labelText: 'Name'),
+              decoration: InputDecoration(
+                labelText: 'Document Name',
+                prefixIcon: const Icon(Icons.edit_outlined),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
               textInputAction: TextInputAction.done,
             ),
             const SizedBox(height: 18),
@@ -495,6 +809,7 @@ class _DocumentPickerSheetState extends State<_DocumentPickerSheet> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

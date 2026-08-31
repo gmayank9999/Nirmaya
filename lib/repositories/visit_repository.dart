@@ -41,7 +41,7 @@ class VisitRepository {
     return res['data'] as Map<String, dynamic>;
   }
 
-  Future<VisitModel> createWithDetails({
+  Future<Map<String, dynamic>> createWithDetails({
     required Map<String, String> fields,
     List<String> reportFilePaths = const [],
     List<String> reportNames = const [],
@@ -64,7 +64,12 @@ class VisitRepository {
       },
     );
     final data = res['data'] as Map<String, dynamic>;
-    return VisitModel.fromJson(data['visit'] as Map<String, dynamic>);
+    
+    // We import TransactionModel dynamically to avoid circular dependencies if any,
+    // actually we already have the transaction details, let's just return the raw map
+    // or we can import transaction_model.dart at the top. 
+    // Let's import it at the top and parse.
+    return data;
   }
 
   Future<VisitModel> update(String id, Map<String, dynamic> body) async {

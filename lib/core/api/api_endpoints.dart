@@ -3,6 +3,7 @@ class ApiEndpoints {
 
   // Change this to your deployed backend URL
   static const String baseUrl = 'https://nirmaya-v2.vercel.app/api';
+  // static const String baseUrl = 'http://10.7.13.124:3001/api'; // Local for Physical Device via Wi-Fi
 
   // Health
   static const String health = '/health/health';

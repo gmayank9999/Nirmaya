@@ -49,7 +49,9 @@ class TransactionModel {
       paymentMode: json['paymentMode'] as String?,
       referenceId: json['referenceId'] as String?,
       notes: json['notes'] as String?,
-      transactionDate: json['createdAt'] as String? ?? '',
+      // The backend stores the user-chosen payment date in createdAt.
+      // We read transactionDate first (future column), fall back to createdAt.
+      transactionDate: (json['transactionDate'] ?? json['createdAt']) as String? ?? '',
       isDeleted: json['isDeleted'] as bool? ?? false,
       createdAt: json['createdAt'] as String? ?? '',
       updatedAt: json['updatedAt'] as String? ?? '',

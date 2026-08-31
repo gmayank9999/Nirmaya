@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -14,49 +15,32 @@ class PatientsListScreen extends StatefulWidget {
   State<PatientsListScreen> createState() => _PatientsListScreenState();
 }
 
-class _PatientsListScreenState extends State<PatientsListScreen>
-    with RouteAware {
+class _PatientsListScreenState extends State<PatientsListScreen> {
   final _searchCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
+  Timer? _debounce;
   String? _gender;
   bool? _hasIdProof;
   bool? _hasCghs;
   bool? _hasEchs;
-  bool _isRouteSubscribed = false;
 
   @override
   void initState() {
     super.initState();
     _scrollCtrl.addListener(_onScroll);
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_isRouteSubscribed) return;
-    final route = ModalRoute.of(context);
-    if (route is PageRoute) {
-      routeObserver.subscribe(this, route);
-      _isRouteSubscribed = true;
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _resetFiltersAndReload();
+      }
+    });
   }
 
   @override
   void dispose() {
-    routeObserver.unsubscribe(this);
+    _debounce?.cancel();
     _searchCtrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();
-  }
-
-  @override
-  void didPopNext() {
-    _resetFiltersAndReload();
-  }
-
-  @override
-  void didPush() {
-    _resetFiltersAndReload();
   }
 
   void _onScroll() {
@@ -73,45 +57,72 @@ class _PatientsListScreenState extends State<PatientsListScreen>
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Patients'),
+        title: const Text('Patients', style: TextStyle(fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
             icon: const Icon(Icons.filter_list),
             onPressed: _showFilters,
-          ),
-          IconButton(
-            icon: const Icon(Icons.person_add),
-            onPressed: () => context.push('/add-patient'),
+            tooltip: 'Filter Patients',
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => context.push('/add-patient'),
+        icon: const Icon(Icons.person_add),
+        label: const Text('Add Patient'),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
       ),
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: TextField(
-              controller: _searchCtrl,
-              onChanged: (v) {
-                setState(() {});
-                context
-                    .read<PatientProvider>()
-                    .loadPatients(search: v, refresh: true);
-              },
-              decoration: InputDecoration(
-                hintText: 'Search patients...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchCtrl.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchCtrl.clear();
-                          context
-                              .read<PatientProvider>()
-                              .loadPatients(refresh: true);
-                          setState(() {});
-                        },
-                      )
-                    : null,
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: TextField(
+                controller: _searchCtrl,
+                onChanged: (v) {
+                  if (_debounce?.isActive ?? false) _debounce!.cancel();
+                  _debounce = Timer(const Duration(milliseconds: 500), () {
+                    if (mounted) {
+                      setState(() {});
+                      context
+                          .read<PatientProvider>()
+                          .loadPatients(search: v, refresh: true);
+                    }
+                  });
+                },
+                decoration: InputDecoration(
+                  hintText: 'Search by name or phone...',
+                  hintStyle: const TextStyle(color: AppColors.textLight, fontSize: 15),
+                  prefixIcon: const Icon(Icons.search, color: AppColors.primary),
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  suffixIcon: _searchCtrl.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, color: AppColors.textSecondary),
+                          onPressed: () {
+                            _searchCtrl.clear();
+                            context
+                                .read<PatientProvider>()
+                                .loadPatients(refresh: true);
+                            setState(() {});
+                          },
+                        )
+                      : null,
+                ),
               ),
             ),
           ),
@@ -136,28 +147,39 @@ class _PatientsListScreenState extends State<PatientsListScreen>
           Expanded(
             child: provider.isLoading && provider.patients.isEmpty
                 ? const Center(child: CircularProgressIndicator())
-                : provider.patients.isEmpty
-                    ? EmptyStateWidget(
-                        title: 'No patients found',
-                        subtitle: 'Add your first patient to get started',
-                        icon: Icons.people_outline,
-                        action: TextButton.icon(
-                          icon: const Icon(Icons.add),
-                          label: const Text('Add Patient'),
-                          onPressed: () => context.push('/add-patient'),
+                : provider.error != null && provider.patients.isEmpty
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Text(
+                            'Error loading patients: ${provider.error}\n\nPlease try again.',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: AppColors.error),
+                          ),
                         ),
                       )
+                    : provider.patients.isEmpty
+                        ? EmptyStateWidget(
+                            title: 'No patients found',
+                            subtitle: 'Add your first patient to get started',
+                            icon: Icons.people_outline,
+                            action: TextButton.icon(
+                              icon: const Icon(Icons.add),
+                              label: const Text('Add Patient'),
+                              onPressed: () => context.push('/add-patient'),
+                            ),
+                          )
                     : RefreshIndicator(
                         onRefresh: () => context
                             .read<PatientProvider>()
                             .loadPatients(refresh: true),
                         child: ListView.separated(
                           controller: _scrollCtrl,
-                          padding: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 88), // Extra padding for FAB
                           itemCount: provider.patients.length +
                               (provider.hasMore ? 1 : 0),
                           separatorBuilder: (_, __) =>
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 12),
                           itemBuilder: (context, i) {
                             if (i == provider.patients.length) {
                               return const Center(

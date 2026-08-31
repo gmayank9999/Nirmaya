@@ -33,12 +33,23 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
       ),
       body: provider.isLoading && provider.transactions.isEmpty
           ? const Center(child: CircularProgressIndicator())
-          : provider.transactions.isEmpty
-              ? const EmptyStateWidget(
-                  title: 'No payments yet',
-                  subtitle: 'Payments will appear here',
-                  icon: Icons.payments_outlined,
+          : provider.error != null && provider.transactions.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Text(
+                      'Error loading payments: ${provider.error}\n\nPlease try again.',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: AppColors.error),
+                    ),
+                  ),
                 )
+              : provider.transactions.isEmpty
+                  ? const EmptyStateWidget(
+                      title: 'No payments yet',
+                      subtitle: 'Payments will appear here',
+                      icon: Icons.payments_outlined,
+                    )
               : RefreshIndicator(
                   onRefresh: () => context
                       .read<TransactionProvider>()
@@ -53,48 +64,84 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.04),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                         ),
                         child: Row(
                           children: [
                             Container(
-                              width: 44,
-                              height: 44,
+                              width: 48,
+                              height: 48,
                               decoration: BoxDecoration(
-                                color: const Color(0xFFE8F5E9),
-                                borderRadius: BorderRadius.circular(12),
+                                color: AppColors.success.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(14),
                               ),
-                              child: const Icon(Icons.currency_rupee,
-                                  color: AppColors.success),
+                              child: const Icon(Icons.check_circle_outline,
+                                  color: AppColors.success, size: 24),
                             ),
-                            const SizedBox(width: 14),
+                            const SizedBox(width: 16),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    t.patientName ?? 'Patient',
+                                    t.patientName ?? 'Unknown Patient',
                                     style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 15,
+                                      color: AppColors.textPrimary,
                                     ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                  Text(
-                                    '${t.paymentModeDisplay} · ${AppDateUtils.formatDateWithOptionalTime(t.transactionDate)}',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: AppColors.textSecondary,
-                                    ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primarySurface,
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          t.paymentModeDisplay,
+                                          style: const TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: AppColors.primary,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          AppDateUtils.formatDateWithOptionalTime(t.transactionDate),
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: AppColors.textSecondary,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
                             ),
+                            const SizedBox(width: 12),
                             Text(
-                              AppDateUtils.formatCurrency(t.amountDouble),
+                              '+${AppDateUtils.formatCurrency(t.amountDouble)}',
                               style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 16,
                                 color: AppColors.success,
+                                letterSpacing: 0.2,
                               ),
                             ),
                           ],

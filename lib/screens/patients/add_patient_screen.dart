@@ -60,8 +60,16 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
     super.dispose();
   }
 
+  /// Shows a bottom sheet asking user to pick Camera or Gallery, then picks the file.
   Future<void> _pickProof(String type) async {
-    final file = await _picker.pickImage(source: ImageSource.gallery);
+    final source = await _showImageSourceSheet();
+    if (source == null) return;
+    final file = await _picker.pickImage(
+      source: source,
+      imageQuality: 50,
+      maxWidth: 1600,
+      maxHeight: 1600,
+    );
     if (file == null) return;
     setState(() {
       if (type == 'id') {
@@ -75,6 +83,77 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
         _hasEchs = true;
       }
     });
+  }
+
+  Future<ImageSource?> _showImageSourceSheet() async {
+    return showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: AppColors.textLight,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const Text(
+                'Choose Source',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ListTile(
+                leading: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: AppColors.primarySurface,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.camera_alt_rounded,
+                      color: AppColors.primary),
+                ),
+                title: const Text('Camera',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: const Text('Take a new photo'),
+                onTap: () => Navigator.pop(context, ImageSource.camera),
+              ),
+              ListTile(
+                leading: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: AppColors.primarySurface,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.photo_library_rounded,
+                      color: AppColors.primary),
+                ),
+                title: const Text('From Device',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: const Text('Choose from gallery'),
+                onTap: () => Navigator.pop(context, ImageSource.gallery),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _submit() async {
@@ -211,9 +290,21 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 24),
+              // Documents section header
+              const Text(
+                'Documents (Optional)',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textSecondary,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const SizedBox(height: 10),
               _ProofPickerTile(
-                title: 'ID proof',
+                title: 'ID Proof',
+                icon: Icons.badge_outlined,
                 enabled: _hasIdProof,
                 fileName: _idProofFile?.name,
                 existingUrl: widget.editPatient?.idProofFileUrl,
@@ -223,6 +314,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
               const SizedBox(height: 10),
               _ProofPickerTile(
                 title: 'CGHS',
+                icon: Icons.local_hospital_outlined,
                 enabled: _hasCghs,
                 fileName: _cghsFile?.name,
                 existingUrl: widget.editPatient?.cghsFileUrl,
@@ -232,6 +324,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
               const SizedBox(height: 10),
               _ProofPickerTile(
                 title: 'ECHS',
+                icon: Icons.military_tech_outlined,
                 enabled: _hasEchs,
                 fileName: _echsFile?.name,
                 existingUrl: widget.editPatient?.echsFileUrl,
@@ -255,6 +348,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
 
 class _ProofPickerTile extends StatelessWidget {
   final String title;
+  final IconData icon;
   final bool enabled;
   final String? fileName;
   final String? existingUrl;
@@ -263,6 +357,7 @@ class _ProofPickerTile extends StatelessWidget {
 
   const _ProofPickerTile({
     required this.title,
+    required this.icon,
     required this.enabled,
     required this.fileName,
     required this.existingUrl,
@@ -273,35 +368,103 @@ class _ProofPickerTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasFile = fileName != null || (existingUrl?.isNotEmpty ?? false);
-    return Container(
-      padding: const EdgeInsets.all(12),
+    final fileLabel = fileName != null
+        ? fileName!
+        : (existingUrl?.isNotEmpty == true ? 'Uploaded ✓' : 'No file selected');
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: enabled
+              ? (hasFile ? AppColors.success : AppColors.primary)
+              : const Color(0xFFE5E7EB),
+          width: enabled ? 1.5 : 1,
+        ),
       ),
       child: Row(
         children: [
-          Switch(value: enabled, onChanged: onChanged),
+          // Icon badge
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: enabled ? AppColors.primarySurface : const Color(0xFFF5F5F5),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              icon,
+              size: 20,
+              color: enabled ? AppColors.primary : AppColors.textLight,
+            ),
+          ),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title,
-                    style: const TextStyle(fontWeight: FontWeight.w600)),
                 Text(
-                  hasFile ? (fileName ?? 'Uploaded') : 'No file selected',
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
+                  title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: enabled ? AppColors.textPrimary : AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  fileLabel,
+                  style: TextStyle(
+                    color: hasFile && enabled ? AppColors.success : AppColors.textSecondary,
                     fontSize: 12,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
           ),
-          IconButton(
-            onPressed: enabled ? onPick : null,
-            icon: const Icon(Icons.upload_file),
+          // Upload button (shown only when enabled)
+          if (enabled)
+            GestureDetector(
+              onTap: onPick,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.primarySurface,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      hasFile ? Icons.refresh_rounded : Icons.upload_rounded,
+                      size: 16,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      hasFile ? 'Change' : 'Upload',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          const SizedBox(width: 8),
+          // Toggle switch
+          Switch(
+            value: enabled,
+            onChanged: onChanged,
+            activeThumbColor: AppColors.primary,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
         ],
       ),

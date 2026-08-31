@@ -63,7 +63,7 @@ class VisitProvider extends ChangeNotifier {
     }
   }
 
-  Future<VisitModel?> createVisitWithDetails({
+  Future<Map<String, dynamic>?> createVisitWithDetails({
     required Map<String, String> fields,
     List<String> reportFilePaths = const [],
     List<String> reportNames = const [],
@@ -74,15 +74,17 @@ class VisitProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      final visit = await _repo.createWithDetails(
+      final res = await _repo.createWithDetails(
         fields: fields,
         reportFilePaths: reportFilePaths,
         reportNames: reportNames,
         prescriptionFilePaths: prescriptionFilePaths,
         prescriptionNames: prescriptionNames,
       );
+      final visit = VisitModel.fromJson(res['visit'] as Map<String, dynamic>);
       _visits.insert(0, visit);
-      return visit;
+      
+      return res; // returns { 'visit': Map, 'transaction': Map?, 'documents': List }
     } catch (e) {
       _error = e.toString();
       return null;

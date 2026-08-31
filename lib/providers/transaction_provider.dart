@@ -63,6 +63,26 @@ class TransactionProvider extends ChangeNotifier {
     }
   }
 
+  Future<TransactionModel?> updateTransaction(
+      String id, Map<String, dynamic> body) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+    try {
+      final data = await _repo.update(id, body);
+      final updated = TransactionModel.fromJson(data);
+      final idx = _transactions.indexWhere((t) => t.id == id);
+      if (idx >= 0) _transactions[idx] = updated;
+      return updated;
+    } catch (e) {
+      _error = e.toString();
+      return null;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<bool> deleteTransaction(String id) async {
     try {
       await _repo.delete(id);
