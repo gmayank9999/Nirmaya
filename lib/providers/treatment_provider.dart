@@ -184,6 +184,12 @@ class TreatmentProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ── Instant local updates for the Docs tab ───────────────────────────────
+  void addDocumentToDetail(DocumentModel doc) {
+    _treatmentDocuments.insert(0, doc);
+    notifyListeners();
+  }
+
   void updateTransactionInDetail(TransactionModel updated) {
     final idx = _treatmentTransactions.indexWhere((t) => t.id == updated.id);
     if (idx >= 0) {

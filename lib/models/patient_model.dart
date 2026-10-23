@@ -1,5 +1,6 @@
 class PatientModel {
   final String id;
+  final int? patientNumber;
   final String clinicId;
   final String name;
   final String phone;
@@ -20,9 +21,11 @@ class PatientModel {
   final bool isActive;
   final String createdAt;
   final String updatedAt;
+  final double? pendingAmount;
 
   const PatientModel({
     required this.id,
+    this.patientNumber,
     required this.clinicId,
     required this.name,
     required this.phone,
@@ -43,11 +46,13 @@ class PatientModel {
     required this.isActive,
     required this.createdAt,
     required this.updatedAt,
+    this.pendingAmount,
   });
 
   factory PatientModel.fromJson(Map<String, dynamic> json) {
     return PatientModel(
       id: json['id'] as String,
+      patientNumber: json['patientNumber'] as int?,
       clinicId: json['clinicId'] as String,
       name: json['name'] as String,
       phone: json['phone'] as String,
@@ -68,8 +73,15 @@ class PatientModel {
       isActive: json['isActive'] as bool? ?? true,
       createdAt: json['createdAt'] as String? ?? '',
       updatedAt: json['updatedAt'] as String? ?? '',
+      pendingAmount: double.tryParse(json['pendingAmount']?.toString() ?? ''),
     );
   }
+
+  /// Short readable ID like NIR-0012. Falls back to the first 8 characters of
+  /// the uuid for records returned without a patient number.
+  String get displayId => patientNumber != null
+      ? 'NIR-${patientNumber.toString().padLeft(4, '0')}'
+      : id.substring(0, id.length < 8 ? id.length : 8).toUpperCase();
 
   String get initials {
     final parts = name.trim().split(' ');

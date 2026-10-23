@@ -19,6 +19,10 @@ import '../screens/transactions/payments_screen.dart';
 import '../screens/transactions/add_transaction_screen.dart';
 import '../screens/followups/add_followup_screen.dart';
 import '../screens/installments/add_installment_screen.dart';
+import '../models/appointment_model.dart';
+import '../screens/appointments/appointments_screen.dart';
+import '../screens/appointments/add_appointment_screen.dart';
+import '../screens/doctors/doctors_screen.dart';
 import 'route_observer.dart';
 
 final _rootNavKey = GlobalKey<NavigatorState>();
@@ -64,6 +68,8 @@ GoRouter createRouter(AuthProvider authProvider) {
         path: '/onboarding',
         builder: (_, __) => const LoginScreen(),
       ),
+
+      // ── Shell (bottom nav) ────────────────────────────────────────────────
       ShellRoute(
         navigatorKey: _shellNavKey,
         builder: (context, state, child) => MainShell(child: child),
@@ -71,6 +77,10 @@ GoRouter createRouter(AuthProvider authProvider) {
           GoRoute(
             path: '/dashboard',
             builder: (_, __) => const DashboardScreen(),
+          ),
+          GoRoute(
+            path: '/appointments',
+            builder: (_, __) => const AppointmentsScreen(),
           ),
           GoRoute(
             path: '/patients',
@@ -82,10 +92,14 @@ GoRouter createRouter(AuthProvider authProvider) {
           ),
           GoRoute(
             path: '/more',
-            builder: (_, state) => const MoreScreen(),
+            builder: (_, __) => const MoreScreen(),
           ),
         ],
       ),
+
+      // ── Detail & form routes ── top-level siblings of ShellRoute.
+      // Reached via context.push() so go_router keeps them in the
+      // navigation stack — back button correctly pops to previous screen.
       GoRoute(
         path: '/patients/:id',
         builder: (_, state) => PatientDetailScreen(
@@ -154,6 +168,23 @@ GoRouter createRouter(AuthProvider authProvider) {
             patientId: extra['patientId'] as String,
             treatmentId: extra['treatmentId'] as String,
             patientName: extra['patientName'] as String? ?? '',
+          );
+        },
+      ),
+      GoRoute(
+        path: '/doctors',
+        builder: (_, state) => DoctorsScreen(
+          openForm: (state.extra as Map<String, dynamic>?)?['openForm'] == true,
+        ),
+      ),
+      GoRoute(
+        path: '/add-appointment',
+        builder: (_, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          return AddAppointmentScreen(
+            initialDate: extra?['initialDate'] as DateTime?,
+            initialDoctorId: extra?['initialDoctorId'] as String?,
+            editAppointment: extra?['edit'] as AppointmentModel?,
           );
         },
       ),
@@ -240,6 +271,21 @@ class MoreScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
+          if (user?.isAdmin == true) ...[
+            ListTile(
+              leading: const Icon(Icons.medical_services_outlined,
+                  color: Color(0xFF5B2E5A)),
+              title: const Text('Doctors',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+              subtitle: const Text('Add and manage clinic doctors'),
+              trailing: const Icon(Icons.chevron_right),
+              tileColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              onTap: () => context.push('/doctors'),
+            ),
+            const SizedBox(height: 12),
+          ],
           ListTile(
             leading: const Icon(Icons.logout, color: Color(0xFFEF5350)),
             title: const Text(

@@ -11,6 +11,8 @@ import 'providers/followup_provider.dart';
 import 'providers/installment_provider.dart';
 import 'providers/document_provider.dart';
 import 'providers/dashboard_provider.dart';
+import 'providers/doctor_provider.dart';
+import 'providers/appointment_provider.dart';
 import 'router/app_router.dart';
 
 void main() async {
@@ -49,6 +51,8 @@ class _NirmayaAppState extends State<NirmayaApp> {
         ChangeNotifierProvider(create: (_) => InstallmentProvider()),
         ChangeNotifierProvider(create: (_) => DocumentProvider()),
         ChangeNotifierProvider(create: (_) => DashboardProvider()),
+        ChangeNotifierProvider(create: (_) => DoctorProvider()),
+        ChangeNotifierProvider(create: (_) => AppointmentProvider()),
       ],
       child: Builder(
         builder: (context) {

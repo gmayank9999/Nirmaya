@@ -24,17 +24,16 @@ class _TreatmentDetailScreenState extends State<TreatmentDetailScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabCtrl;
 
-  int _tabIndex = 0;
+  // Taps select their destination immediately. During a swipe, index still
+  // refers to the old page until scrolling ends, so use the visible page.
+  int get _activeTab => _tabCtrl.indexIsChanging
+      ? _tabCtrl.index
+      : _tabCtrl.animation!.value.round().clamp(0, _tabCtrl.length - 1);
 
   @override
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 3, vsync: this);
-    _tabCtrl.addListener(() {
-      if (!_tabCtrl.indexIsChanging) {
-        setState(() => _tabIndex = _tabCtrl.index);
-      }
-    });
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
@@ -73,8 +72,8 @@ class _TreatmentDetailScreenState extends State<TreatmentDetailScreen>
         ],
         bottom: TabBar(
           controller: _tabCtrl,
-          labelColor: Colors.white, 
-          unselectedLabelColor: Colors.white70, 
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
           tabs: const [
             Tab(text: 'Visits'),
             Tab(text: 'Payments'),
@@ -130,27 +129,34 @@ class _TreatmentDetailScreenState extends State<TreatmentDetailScreen>
                     ),
                   ],
                 ),
-      // Hide FAB on Docs tab (index 2) since docs are linked to visits
-      floatingActionButton: treatment != null && _tabIndex != 2
-          ? FloatingActionButton(
-              onPressed: () {
-                if (_tabIndex == 0) {
-                  context.push('/add-visit', extra: {
-                    'treatmentId': treatment.id,
-                    'treatmentTitle': treatment.title,
-                    'remainingAmount': treatment.balanceDouble,
-                  });
-                } else if (_tabIndex == 1) {
-                  context.push('/add-transaction', extra: {
-                    'treatmentId': treatment.id,
-                    'patientId': treatment.patientId,
-                    'treatmentTitle': treatment.title,
-                  });
-                }
+      floatingActionButton: treatment != null
+          ? AnimatedBuilder(
+              animation: Listenable.merge([_tabCtrl, _tabCtrl.animation!]),
+              builder: (context, _) {
+                if (_activeTab == 2) return const SizedBox.shrink();
+                return FloatingActionButton(
+                  tooltip: _activeTab == 0 ? 'Add Visit' : 'Record Payment',
+                  onPressed: () {
+                    final currentTab = _activeTab;
+                    if (currentTab == 0) {
+                      context.push('/add-visit', extra: {
+                        'treatmentId': treatment.id,
+                        'treatmentTitle': treatment.title,
+                        'remainingAmount': treatment.balanceDouble,
+                      });
+                    } else if (currentTab == 1) {
+                      context.push('/add-transaction', extra: {
+                        'treatmentId': treatment.id,
+                        'patientId': treatment.patientId,
+                        'treatmentTitle': treatment.title,
+                      });
+                    }
+                  },
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  child: const Icon(Icons.add),
+                );
               },
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              child: const Icon(Icons.add),
             )
           : null,
     );

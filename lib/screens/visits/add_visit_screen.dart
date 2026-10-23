@@ -9,9 +9,11 @@ import '../../core/constants/app_colors.dart';
 import '../../core/utils/app_date_utils.dart';
 import '../../providers/treatment_provider.dart';
 import '../../providers/visit_provider.dart';
+import '../../models/document_model.dart';
 import '../../models/visit_model.dart';
 import '../../models/transaction_model.dart';
 import '../../widgets/app_button.dart';
+import '../../widgets/payment_options.dart';
 
 final _inFmt = NumberFormat('#,##,##0', 'en_IN');
 String _strip(String v) => v.replaceAll(',', '');
@@ -56,6 +58,7 @@ class _AddVisitScreenState extends State<AddVisitScreen> {
   final _paymentNotesCtrl = TextEditingController();
   DateTime _visitDate = DateTime.now();
   bool _hasPayment = false;
+  bool _sendSms = false;
   String _paymentMode = 'cash';
   final List<_NamedFile> _reportFiles = [];
   final List<_NamedFile> _prescriptionFiles = [];
@@ -145,6 +148,7 @@ class _AddVisitScreenState extends State<AddVisitScreen> {
       if (_hasPayment && _amountCtrl.text.isNotEmpty)
         'paymentAmount': _parseAmount(_amountCtrl.text).toString(),
       if (_hasPayment) 'paymentMode': _paymentMode,
+      if (_hasPayment) 'sendSms': _sendSms.toString(),
       if (_hasPayment && _referenceCtrl.text.isNotEmpty)
         'paymentReferenceId': _referenceCtrl.text.trim(),
       if (_hasPayment && _paymentNotesCtrl.text.isNotEmpty)
@@ -163,18 +167,31 @@ class _AddVisitScreenState extends State<AddVisitScreen> {
                 _prescriptionFiles.map((item) => item.name).toList(),
           )
         : await provider.createVisit(fields);
-        
+
     if (result != null && mounted) {
+      final tp = context.read<TreatmentProvider>();
       if (result is VisitModel) {
-        context.read<TreatmentProvider>().addVisitToDetail(result);
+        tp.addVisitToDetail(result);
       } else if (result is Map<String, dynamic>) {
         if (result['visit'] != null) {
-          final v = VisitModel.fromJson(result['visit'] as Map<String, dynamic>);
-          context.read<TreatmentProvider>().addVisitToDetail(v);
+          final v =
+              VisitModel.fromJson(result['visit'] as Map<String, dynamic>);
+          tp.addVisitToDetail(v);
         }
         if (result['transaction'] != null) {
-          final tx = TransactionModel.fromJson(result['transaction'] as Map<String, dynamic>);
-          context.read<TreatmentProvider>().addTransactionToDetail(tx);
+          final tx = TransactionModel.fromJson(
+              result['transaction'] as Map<String, dynamic>);
+          tp.addTransactionToDetail(tx);
+        }
+        // Parse and add documents so they appear immediately in the Docs tab
+        // without requiring the user to go back and re-enter the treatment screen.
+        final docsRaw = result['documents'];
+        if (docsRaw is List) {
+          for (final d in docsRaw) {
+            if (d is Map<String, dynamic>) {
+              tp.addDocumentToDetail(DocumentModel.fromJson(d));
+            }
+          }
         }
       }
       context.pop();
@@ -266,7 +283,6 @@ class _AddVisitScreenState extends State<AddVisitScreen> {
                     ],
                   ),
                 ),
-
               _Card(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -321,7 +337,6 @@ class _AddVisitScreenState extends State<AddVisitScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-
               _Card(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -332,7 +347,10 @@ class _AddVisitScreenState extends State<AddVisitScreen> {
                         _label('Payment', Icons.payments_outlined),
                         Switch(
                           value: _hasPayment,
-                          onChanged: (v) => setState(() => _hasPayment = v),
+                          onChanged: (v) => setState(() {
+                            _hasPayment = v;
+                            _sendSms = false;
+                          }),
                           activeTrackColor: AppColors.primary,
                         ),
                       ],
@@ -351,7 +369,9 @@ class _AddVisitScreenState extends State<AddVisitScreen> {
                             return 'Amount is required';
                           }
                           final d = double.tryParse(_strip(v));
-                          if (d == null || d <= 0) return 'Enter a valid amount';
+                          if (d == null || d <= 0) {
+                            return 'Enter a valid amount';
+                          }
                           return null;
                         },
                         decoration: InputDecoration(
@@ -390,6 +410,12 @@ class _AddVisitScreenState extends State<AddVisitScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
+                      PaymentSmsOption(
+                        treatmentId: widget.treatmentId,
+                        value: _sendSms,
+                        onChanged: (value) => setState(() => _sendSms = value),
+                      ),
+                      if (_paymentMode == 'upi') const UpiQrCard(),
                       _label('Payment Mode', Icons.payment_outlined),
                       const SizedBox(height: 10),
                       Row(
@@ -461,7 +487,6 @@ class _AddVisitScreenState extends State<AddVisitScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-
               _Card(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -483,7 +508,6 @@ class _AddVisitScreenState extends State<AddVisitScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-
               AppButton(
                 label: 'Add Visit',
                 onPressed: _submit,
@@ -572,8 +596,7 @@ class _StyledField extends StatelessWidget {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide:
-                const BorderSide(color: AppColors.primary, width: 1.5),
+            borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
           ),
         ),
       );
@@ -721,95 +744,95 @@ class _DocumentPickerSheetState extends State<_DocumentPickerSheet> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-              widget.title,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFE5E7EB)),
-              ),
-              child: Column(
-                children: [
-                  Icon(
-                    _pickedFile == null
-                        ? Icons.upload_file_outlined
-                        : Icons.description_outlined,
-                    color: AppColors.primary,
-                    size: 32,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _pickedFile?.fileName ?? 'No file selected',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () => _pickImage(ImageSource.camera),
-                          icon: const Icon(Icons.photo_camera_outlined),
-                          label: const Text('Camera'),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () => _pickImage(ImageSource.gallery),
-                          icon: const Icon(Icons.photo_library_outlined),
-                          label: const Text('Gallery'),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: _pickAnyFile,
-                      icon: const Icon(Icons.attach_file),
-                      label: const Text('Choose File / PDF'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _nameCtrl,
-              decoration: InputDecoration(
-                labelText: 'Document Name',
-                prefixIcon: const Icon(Icons.edit_outlined),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                widget.title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-              textInputAction: TextInputAction.done,
-            ),
-            const SizedBox(height: 18),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: _pickedFile == null ? null : _addFile,
-                icon: const Icon(Icons.check),
-                label: const Text('Add File'),
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                ),
+                child: Column(
+                  children: [
+                    Icon(
+                      _pickedFile == null
+                          ? Icons.upload_file_outlined
+                          : Icons.description_outlined,
+                      color: AppColors.primary,
+                      size: 32,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _pickedFile?.fileName ?? 'No file selected',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _pickImage(ImageSource.camera),
+                            icon: const Icon(Icons.photo_camera_outlined),
+                            label: const Text('Camera'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _pickImage(ImageSource.gallery),
+                            icon: const Icon(Icons.photo_library_outlined),
+                            label: const Text('Gallery'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _pickAnyFile,
+                        icon: const Icon(Icons.attach_file),
+                        label: const Text('Choose File / PDF'),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 14),
+              TextFormField(
+                controller: _nameCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Document Name',
+                  prefixIcon: const Icon(Icons.edit_outlined),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                textInputAction: TextInputAction.done,
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: _pickedFile == null ? null : _addFile,
+                  icon: const Icon(Icons.check),
+                  label: const Text('Add File'),
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }

@@ -3,11 +3,16 @@ import '../models/patient_model.dart';
 import '../repositories/patient_repository.dart';
 
 class PatientProvider extends ChangeNotifier {
-  final _repo = PatientRepository();
+  final PatientRepository _repo;
+
+  PatientProvider({PatientRepository? repository})
+      : _repo = repository ?? PatientRepository();
 
   List<PatientModel> _patients = [];
   int _total = 0;
   bool _isLoading = false;
+  bool _isLoadingList = false;
+  int _listRequestId = 0;
   bool _isLoadingMore = false;
   String? _error;
   String _search = '';
@@ -15,6 +20,8 @@ class PatientProvider extends ChangeNotifier {
   bool? _hasIdProof;
   bool? _hasCghs;
   bool? _hasEchs;
+  double? _minPending;
+  bool _highestPendingFirst = false;
   int _page = 1;
   static const int _limit = 20;
 
@@ -22,7 +29,7 @@ class PatientProvider extends ChangeNotifier {
 
   List<PatientModel> get patients => _patients;
   int get total => _total;
-  bool get isLoading => _isLoading;
+  bool get isLoading => _isLoading || _isLoadingList;
   bool get isLoadingMore => _isLoadingMore;
   String? get error => _error;
   PatientModel? get selectedPatient => _selectedPatient;
@@ -34,6 +41,8 @@ class PatientProvider extends ChangeNotifier {
     bool? hasIdProof,
     bool? hasCghs,
     bool? hasEchs,
+    double? minPending,
+    bool highestPendingFirst = false,
     bool refresh = false,
     bool filtersChanged = false,
   }) async {
@@ -42,14 +51,18 @@ class PatientProvider extends ChangeNotifier {
       _hasIdProof = hasIdProof;
       _hasCghs = hasCghs;
       _hasEchs = hasEchs;
+      _minPending = minPending;
+      _highestPendingFirst = highestPendingFirst;
     }
-    if (refresh || search != _search) {
-      _search = search ?? '';
-      _page = 1;
-      _patients = [];
-    }
-    if (_isLoading) return;
-    _isLoading = true;
+    // Every new query supersedes earlier searches and pagination requests.
+    // An omitted search preserves it; an empty string explicitly clears it.
+    if (search != null) _search = search.trim();
+    final requestId = ++_listRequestId;
+    _page = 1;
+    _patients = [];
+    _total = 0;
+    _isLoadingList = true;
+    _isLoadingMore = false;
     _error = null;
     notifyListeners();
     try {
@@ -59,42 +72,56 @@ class PatientProvider extends ChangeNotifier {
         hasIdProof: _hasIdProof,
         hasCghs: _hasCghs,
         hasEchs: _hasEchs,
+        minPending: _minPending,
+        highestPendingFirst: _highestPendingFirst,
         page: _page,
         limit: _limit,
       );
+      if (requestId != _listRequestId) return;
       _patients = result.patients;
       _total = result.total;
     } catch (e) {
+      if (requestId != _listRequestId) return;
       _error = e.toString();
     } finally {
-      _isLoading = false;
-      notifyListeners();
+      if (requestId == _listRequestId) {
+        _isLoadingList = false;
+        notifyListeners();
+      }
     }
   }
 
   Future<void> loadMore() async {
-    if (_isLoadingMore || !hasMore) return;
+    if (_isLoadingList || _isLoadingMore || !hasMore) return;
+    final requestId = _listRequestId;
+    final nextPage = _page + 1;
     _isLoadingMore = true;
+    _error = null;
     notifyListeners();
     try {
-      _page++;
       final result = await _repo.list(
         search: _search,
         gender: _gender,
         hasIdProof: _hasIdProof,
         hasCghs: _hasCghs,
         hasEchs: _hasEchs,
-        page: _page,
+        minPending: _minPending,
+        highestPendingFirst: _highestPendingFirst,
+        page: nextPage,
         limit: _limit,
       );
+      if (requestId != _listRequestId) return;
+      _page = nextPage;
       _patients.addAll(result.patients);
       _total = result.total;
     } catch (e) {
-      _page--;
+      if (requestId != _listRequestId) return;
       _error = e.toString();
     } finally {
-      _isLoadingMore = false;
-      notifyListeners();
+      if (requestId == _listRequestId) {
+        _isLoadingMore = false;
+        notifyListeners();
+      }
     }
   }
 

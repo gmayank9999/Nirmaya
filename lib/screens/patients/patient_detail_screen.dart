@@ -154,7 +154,6 @@ class _ProfileCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Short patient ID for display: first 8 chars of UUID
-    final shortId = patient.id.length >= 8 ? patient.id.substring(0, 8) : patient.id;
 
     return Container(
       decoration: BoxDecoration(
@@ -299,9 +298,9 @@ class _ProfileCard extends StatelessWidget {
                     _InfoChip(
                       icon: Icons.tag_outlined,
                       label: 'Patient ID',
-                      value: shortId.toUpperCase(),
+                      value: patient.displayId,
                       onTap: () {
-                        Clipboard.setData(ClipboardData(text: patient.id));
+                        Clipboard.setData(ClipboardData(text: patient.displayId));
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text('Patient ID copied to clipboard'),

@@ -2,17 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../models/patient_model.dart';
 import '../core/constants/app_colors.dart';
+import '../core/utils/app_date_utils.dart';
 
 class PatientCard extends StatelessWidget {
   final PatientModel patient;
   final String? subtitle;
+  final VoidCallback? onTap;
 
-  const PatientCard({super.key, required this.patient, this.subtitle});
+  const PatientCard(
+      {super.key, required this.patient, this.subtitle, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => context.push('/patients/${patient.id}'),
+      onTap: onTap ?? () => context.push('/patients/${patient.id}'),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -44,12 +47,30 @@ class PatientCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    subtitle ?? patient.phone,
+                    subtitle ??
+                        (patient.patientNumber != null
+                            ? '${patient.displayId} • ${patient.phone}'
+                            : patient.phone),
                     style: const TextStyle(
                       fontSize: 13,
                       color: AppColors.textSecondary,
                     ),
                   ),
+                  if (patient.pendingAmount != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      patient.pendingAmount! > 0
+                          ? 'Pending: ${AppDateUtils.formatCurrency(patient.pendingAmount)}'
+                          : 'No pending payment',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: patient.pendingAmount! > 0
+                            ? AppColors.error
+                            : AppColors.success,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

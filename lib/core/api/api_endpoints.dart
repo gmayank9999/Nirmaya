@@ -1,9 +1,11 @@
 class ApiEndpoints {
   ApiEndpoints._();
 
-  // Change this to your deployed backend URL
-  static const String baseUrl = 'https://nirmaya-v2.vercel.app/api';
-  // static const String baseUrl = 'http://10.7.13.124:3001/api'; // Local for Physical Device via Wi-Fi
+  // Production by default. Use --dart-define=API_BASE_URL=... for local testing.
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'https://nirmaya-clinic-api.vercel.app/api',
+  );
 
   // Health
   static const String health = '/health/health';
@@ -46,6 +48,14 @@ class ApiEndpoints {
   // Follow-ups
   static const String followups = '/followups';
   static String followup(String id) => '/followups/$id';
+
+  // Doctors
+  static const String doctors = '/doctors';
+  static String doctor(String id) => '/doctors/$id';
+
+  // Appointments
+  static const String appointments = '/appointments';
+  static String appointment(String id) => '/appointments/$id';
 
   // Bills
   static const String generateBill = '/bills/generate';

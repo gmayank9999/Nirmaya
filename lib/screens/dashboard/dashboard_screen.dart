@@ -118,7 +118,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       icon: Icons.people_outline,
                       color: AppColors.primary,
                       background: AppColors.primarySurface,
-                      onTap: () => context.go('/patients'),
+                      onTap: () => context.push('/patients'),
                     ),
                     SummaryCard(
                       title: "Today's Collection",
@@ -126,7 +126,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       icon: Icons.currency_rupee,
                       color: AppColors.success,
                       background: const Color(0xFFE8F5E9),
-                      onTap: () => context.go('/payments'),
+                      onTap: () => context.push('/payments'),
                     ),
                   ],
                 ),
@@ -140,7 +140,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   children: [
                     _SectionHeader(
                       title: 'Recent Patients',
-                      onTap: () => context.go('/patients'),
+                      onTap: () => context.push('/patients'),
                     ),
                     const SizedBox(height: 16),
                     if (dashboard.recentPatients.isEmpty && !dashboard.isLoading)
@@ -188,29 +188,51 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildQuickActions(BuildContext context) {
+    // Three per row so labels like "Appointment" never get squeezed;
+    // extra actions wrap onto a second, centered row.
+    final itemWidth = (MediaQuery.of(context).size.width - 40) / 3;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        runSpacing: 18,
         children: [
           _QuickActionButton(
+            width: itemWidth,
             icon: Icons.person_add_alt_1_outlined,
             label: 'Add Patient',
             color: AppColors.primary,
             onTap: () => context.push('/add-patient'),
           ),
           _QuickActionButton(
+            width: itemWidth,
             icon: Icons.payments_outlined,
             label: 'Payments',
             color: AppColors.success,
-            onTap: () => context.go('/payments'),
+            onTap: () => context.push('/payments'),
           ),
           _QuickActionButton(
+            width: itemWidth,
             icon: Icons.medical_information_outlined,
             label: 'Add Visit',
             color: AppColors.info,
-            onTap: () => context.go('/patients'),
+            onTap: () => context.push('/patients'),
           ),
+          _QuickActionButton(
+            width: itemWidth,
+            icon: Icons.event_available_outlined,
+            label: 'Appointment',
+            color: AppColors.warning,
+            onTap: () => context.push('/add-appointment'),
+          ),
+          if (context.read<AuthProvider>().user?.isAdmin == true)
+            _QuickActionButton(
+              width: itemWidth,
+              icon: Icons.medical_services_outlined,
+              label: 'Add Doctor',
+              color: AppColors.primaryLight,
+              onTap: () => context.push('/doctors', extra: {'openForm': true}),
+            ),
         ],
       ),
     );
@@ -223,18 +245,23 @@ class _QuickActionButton extends StatelessWidget {
   final Color color;
   final VoidCallback onTap;
 
+  final double width;
+
   const _QuickActionButton({
     required this.icon,
     required this.label,
     required this.color,
     required this.onTap,
+    required this.width,
   });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Column(
+      child: SizedBox(
+        width: width,
+        child: Column(
         children: [
           Container(
             width: 56,
@@ -255,6 +282,9 @@ class _QuickActionButton extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             label,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
@@ -262,6 +292,7 @@ class _QuickActionButton extends StatelessWidget {
             ),
           ),
         ],
+        ),
       ),
     );
   }

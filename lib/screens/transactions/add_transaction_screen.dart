@@ -8,6 +8,7 @@ import '../../models/transaction_model.dart';
 import '../../providers/transaction_provider.dart';
 import '../../providers/treatment_provider.dart';
 import '../../widgets/app_button.dart';
+import '../../widgets/payment_options.dart';
 
 // ── Indian number formatter (integers only for payments) ─────────────────────
 final _inFmt = NumberFormat('#,##,##0', 'en_IN');
@@ -33,6 +34,7 @@ class AddTransactionScreen extends StatefulWidget {
   final String treatmentId;
   final String patientId;
   final String treatmentTitle;
+
   /// Pass an existing transaction to enter edit mode
   final TransactionModel? editTransaction;
 
@@ -54,6 +56,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   final _notesCtrl = TextEditingController();
   final _refCtrl = TextEditingController();
 
+  bool _sendSms = false;
   String _paymentMode = 'cash';
   late DateTime _transactionDate;
 
@@ -76,7 +79,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       _notesCtrl.text = tx.notes ?? '';
       _refCtrl.text = tx.referenceId ?? '';
       _paymentMode = tx.paymentMode ?? 'cash';
-      _transactionDate = DateTime.tryParse(tx.transactionDate) ?? DateTime.now();
+      _transactionDate =
+          DateTime.tryParse(tx.transactionDate) ?? DateTime.now();
     } else {
       _transactionDate = DateTime.now(); // default: right now
     }
@@ -131,14 +135,15 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       'amount': amount,
       'paymentMode': _paymentMode,
       'type': 'payment',
+      'sendSms': _sendSms,
       'transactionDate': _transactionDate.toUtc().toIso8601String(),
       if (_notesCtrl.text.isNotEmpty) 'notes': _notesCtrl.text.trim(),
       if (_refCtrl.text.isNotEmpty) 'referenceId': _refCtrl.text.trim(),
     };
 
     if (_isEdit) {
-      final updated = await txProvider.updateTransaction(
-          widget.editTransaction!.id, body);
+      final updated =
+          await txProvider.updateTransaction(widget.editTransaction!.id, body);
       if (updated != null && mounted) {
         // Instantly update the detail screen's list
         treatProvider.updateTransactionInDetail(updated);
@@ -190,8 +195,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               if (widget.treatmentTitle.isNotEmpty)
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
                     gradient: AppColors.primaryGradient,
@@ -293,12 +298,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                           child: Padding(
                             padding: const EdgeInsets.only(right: 6),
                             child: GestureDetector(
-                              onTap: () =>
-                                  setState(() => _paymentMode = m.$1),
+                              onTap: () => setState(() => _paymentMode = m.$1),
                               child: AnimatedContainer(
                                 duration: const Duration(milliseconds: 180),
-                                padding: const EdgeInsets.symmetric(
-                                    vertical: 10),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 10),
                                 decoration: BoxDecoration(
                                   color: selected
                                       ? AppColors.primary
@@ -413,6 +417,14 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               ),
               const SizedBox(height: 24),
 
+              if (_paymentMode == 'upi') const UpiQrCard(),
+              PaymentSmsOption(
+                patientId: widget.patientId,
+                treatmentId: widget.treatmentId,
+                value: _sendSms,
+                onChanged: (value) => setState(() => _sendSms = value),
+              ),
+              const SizedBox(height: 16),
               AppButton(
                 label: _isEdit ? 'Update Payment' : 'Record Payment',
                 onPressed: _submit,
@@ -501,8 +513,7 @@ class _StyledField extends StatelessWidget {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide:
-                const BorderSide(color: AppColors.primary, width: 1.5),
+            borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
           ),
         ),
       );

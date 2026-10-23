@@ -5,12 +5,18 @@ class MainShell extends StatelessWidget {
   final Widget child;
   const MainShell({super.key, required this.child});
 
+  static const _routes = [
+    '/dashboard',
+    '/appointments',
+    '/patients',
+    '/payments',
+    '/more',
+  ];
+
   int _locationIndex(BuildContext context) {
     final location = GoRouterState.of(context).uri.toString();
-    if (location.startsWith('/patients')) return 1;
-    if (location.startsWith('/payments')) return 2;
-    if (location.startsWith('/more')) return 3;
-    return 0;
+    final i = _routes.indexWhere(location.startsWith);
+    return i < 0 ? 0 : i;
   }
 
   @override
@@ -21,22 +27,20 @@ class MainShell extends StatelessWidget {
       bottomNavigationBar: NavigationBar(
         selectedIndex: index,
         onDestinationSelected: (i) {
-          switch (i) {
-            case 0:
-              context.go('/dashboard');
-            case 1:
-              context.go('/patients');
-            case 2:
-              context.go('/payments');
-            case 3:
-              context.go('/more');
-          }
+          if (i == index) return;
+          // Keep the screen we came from on the stack for system Back.
+          context.push(_routes[i]);
         },
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.dashboard_outlined),
             selectedIcon: Icon(Icons.dashboard),
             label: 'Dashboard',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.calendar_month_outlined),
+            selectedIcon: Icon(Icons.calendar_month),
+            label: 'Calendar',
           ),
           NavigationDestination(
             icon: Icon(Icons.people_outlined),
